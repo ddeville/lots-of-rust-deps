@@ -15,16 +15,11 @@ def generate_workspace(out: str, deps_count: int):
         os.makedirs(src)
 
         with open(os.path.join(src, "lib.rs"), "w") as f:
-            if idx:
-                f.write("\n".join(["use " + DEP_NAME_PREFIX + str(i) + "::" + FUNCTION_PREFIX + str(i) + ";" for i in range(idx)]))
-                f.write("\n\n")
-                f.write(f"pub fn {FUNCTION_PREFIX + str(idx)}() {{\n")
-                f.write("\n".join(["    " + FUNCTION_PREFIX + str(i) + "();" for i in range(idx)]))
-                f.write("\n}\n")
-            else:
-                f.write(f"pub fn {FUNCTION_PREFIX + str(idx)}() {{\n")
-                f.write("    println!(\"hello\");\n")
-                f.write("}")
+            f.write("\n".join(["use " + DEP_NAME_PREFIX + str(i) + "::" + FUNCTION_PREFIX + str(i) + ";" for i in range(idx)]))
+            f.write("\n\n")
+            f.write(f"pub fn {FUNCTION_PREFIX + str(idx)}() {{\n")
+            f.write("\n".join(["    " + FUNCTION_PREFIX + str(i) + "();" for i in range(idx)]))
+            f.write("\n}\n")
 
     src = os.path.join(out, MAIN_CRATE_NAME, "src")
     os.makedirs(src)
