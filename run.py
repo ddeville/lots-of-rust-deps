@@ -29,6 +29,18 @@ def generate_workspace(out: str, deps_count: int):
         f.write("\n".join(["    " + FUNCTION_PREFIX + str(i) + "();" for i in range(deps_count)]))
         f.write("\n}\n")
 
+def deps_args(deps, build_dir):
+    args = ["--extern=" + name + "=" + os.path.join(build_dir, name, "lib" + name + ".rlib") for name in deps]
+    args += ["-Ldependency=" + os.path.join(build_dir, name) for name in deps]
+    return args
+
+def param_file(args, build_dir, name):
+    param_file_path = os.path.join(build_dir, name, name + ".params")
+    with open(param_file_path, "w") as f:
+        content = "\n".join(args)
+        f.write(content)
+    return "@" + param_file_path
+
 def build_workspace(out: str, deps_count: int, target: str):
     build_dir = os.path.join(out, "build")
     os.makedirs(build_dir)
@@ -49,8 +61,8 @@ def build_workspace(out: str, deps_count: int, target: str):
         base_args.append("--target=" + target)
 
     rustc = "rustc.exe" if sys.platform.startswith("win") else "rustc"
-
     deps = []
+
     for idx in range(deps_count):
         name = DEP_NAME_PREFIX + str(idx)
         os.makedirs(os.path.join(build_dir, name))
@@ -60,10 +72,12 @@ def build_workspace(out: str, deps_count: int, target: str):
             "--crate-type=rlib",
             "--out-dir=" + os.path.join(build_dir, name),
             *base_args,
+            *deps_args(deps, build_dir),
         ]
         deps.append(name)
+
         print("Building", name)
-        subprocess.check_call([rustc] + args)
+        subprocess.check_call([rustc, param_file(args, build_dir, name)])
 
     name = MAIN_CRATE_NAME
     os.makedirs(os.path.join(build_dir, name))
@@ -73,19 +87,11 @@ def build_workspace(out: str, deps_count: int, target: str):
         "--crate-type=cdylib",
         "--out-dir=" + os.path.join(build_dir, name),
         *base_args,
-        *["--extern=" + name + "=" + os.path.join(build_dir, name, "lib" + name + ".rlib") for name in deps],
-        *["-Ldependency=" + os.path.join(build_dir, name) for name in deps],
+        *deps_args(deps, build_dir),
     ]
 
     print("Building", name)
-
-    param_file_path = os.path.join(build_dir, name + ".params")
-    with open(param_file_path, "w") as f:
-        content = "\n".join(args)
-        f.write(content)
-        print("Param file length:", len(content))
-
-    subprocess.check_call([rustc, "@" + param_file_path])
+    subprocess.check_call([rustc, param_file(args, build_dir, name)])
 
 
 if __name__ == "__main__":
