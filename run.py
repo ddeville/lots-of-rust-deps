@@ -7,6 +7,35 @@ import sys
 MAIN_CRATE_NAME = "so_many_deps"
 DEP_NAME_PREFIX = "some_long_and_annoying_name_"
 FUNCTION_PREFIX = "some_function_"
+MACRO_PREFIX = "some_macro_"
+
+DEP_TEMPLATE = """
+{externs}
+{uses}
+
+pub fn {func}() {{
+    println!("Hello");
+    {func_calls}
+    {macro_calls}
+}}
+
+#[macro_export]
+macro_rules! {macro} {{
+    () => {{
+        println!("World!");
+    }};
+}}
+"""
+
+LIB_TEMPLATE = """
+{externs}
+{uses}
+
+pub fn main() {{
+    {func_calls}
+    {macro_calls}
+}}
+"""
 
 def generate_workspace(out: str, deps_count: int):
     for idx in range(deps_count):
@@ -15,21 +44,27 @@ def generate_workspace(out: str, deps_count: int):
         os.makedirs(src)
 
         with open(os.path.join(src, "lib.rs"), "w") as f:
-            f.write("\n".join(["use " + DEP_NAME_PREFIX + str(i) + "::" + FUNCTION_PREFIX + str(i) + ";" for i in range(idx)]))
-            f.write("\n\n")
-            f.write(f"pub fn {FUNCTION_PREFIX + str(idx)}() {{\n")
-            f.write("\n".join(["    " + FUNCTION_PREFIX + str(i) + "();" for i in range(idx)]))
-            f.write("\n}\n")
+            f.write(DEP_TEMPLATE.format(
+                externs = "\n".join(["#[macro_use] extern crate " + DEP_NAME_PREFIX + str(i) + ";" for i in range(idx)]),
+                # externs = "\n".join(["use " + DEP_NAME_PREFIX + str(i) + "::" + MACRO_PREFIX + str(i) + ";" for i in range(idx)]),
+                uses = "\n".join(["use " + DEP_NAME_PREFIX + str(i) + "::" + FUNCTION_PREFIX + str(i) + ";" for i in range(idx)]),
+                func = FUNCTION_PREFIX + str(idx),
+                macro = MACRO_PREFIX + str(idx),
+                func_calls = "\n".join(["    " + FUNCTION_PREFIX + str(i) + "();" for i in range(idx)]),
+                macro_calls = "\n".join(["    " + MACRO_PREFIX + str(i) + "!();" for i in range(idx)]),
+            ))
 
     src = os.path.join(out, MAIN_CRATE_NAME, "src")
     os.makedirs(src)
 
     with open(os.path.join(src, "lib.rs"), "w") as f:
-        f.write("\n".join(["use " + DEP_NAME_PREFIX + str(i) + "::" + FUNCTION_PREFIX + str(i) + ";" for i in range(deps_count)]))
-        f.write("\n\n")
-        f.write("pub fn main() {\n")
-        f.write("\n".join(["    " + FUNCTION_PREFIX + str(i) + "();" for i in range(deps_count)]))
-        f.write("\n}\n")
+        f.write(LIB_TEMPLATE.format(
+            externs = "\n".join(["#[macro_use] extern crate " + DEP_NAME_PREFIX + str(i) + ";" for i in range(deps_count)]),
+            # externs = "\n".join(["use " + DEP_NAME_PREFIX + str(i) + "::" + MACRO_PREFIX + str(i) + ";" for i in range(deps_count)]),
+            uses = "\n".join(["use " + DEP_NAME_PREFIX + str(i) + "::" + FUNCTION_PREFIX + str(i) + ";" for i in range(deps_count)]),
+            func_calls = "\n".join(["    " + FUNCTION_PREFIX + str(i) + "();" for i in range(deps_count)]),
+            macro_calls = "\n".join(["    " + MACRO_PREFIX + str(i) + "!();" for i in range(deps_count)]),
+        ))
 
 def deps_args(deps, build_dir):
     args = ["--extern=" + name + "=" + os.path.join(build_dir, name, "lib" + name + ".rlib") for name in deps]
