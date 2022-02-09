@@ -15,8 +15,8 @@ DEP_TEMPLATE = """
 
 pub fn {func}() {{
     println!("Hello");
-    {func_calls}
-    {macro_calls}
+{func_calls}
+{macro_calls}
 }}
 
 #[macro_export]
@@ -32,8 +32,8 @@ LIB_TEMPLATE = """
 {uses}
 
 pub fn main() {{
-    {func_calls}
-    {macro_calls}
+{func_calls}
+{macro_calls}
 }}
 """
 
