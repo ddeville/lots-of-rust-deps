@@ -1,3 +1,4 @@
+import argparse
 import os
 import shutil
 import subprocess
@@ -43,6 +44,9 @@ def build_workspace(out: str, deps_count: int, target: str):
         "--color=always",
     ]
 
+    if target:
+        base_args.append("--target=" + target)
+
     deps = []
     for idx in range(deps_count):
         name = DEP_NAME_PREFIX + str(idx)
@@ -51,7 +55,6 @@ def build_workspace(out: str, deps_count: int, target: str):
             os.path.join(out, name, "src", "lib.rs"),
             "--crate-name=" + name,
             "--crate-type=rlib",
-            "--target=" + target,
             "--out-dir=" + os.path.join(build_dir, name),
             *base_args,
         ]
@@ -65,7 +68,6 @@ def build_workspace(out: str, deps_count: int, target: str):
         os.path.join(out, name, "src", "lib.rs"),
         "--crate-name=" + name,
         "--crate-type=cdylib",
-        "--target=" + target,
         "--out-dir=" + os.path.join(build_dir, name),
         *base_args,
         *["--extern=" + name + "=" + os.path.join(build_dir, name, "lib" + name + ".rlib") for name in deps],
@@ -84,12 +86,14 @@ def build_workspace(out: str, deps_count: int, target: str):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate and build a Rust workspace")
+    parser.add_argument("--deps_count", required=True, type=int, help="The number of dependencies to generate")
+    parser.add_argument("--target", help="The target to build")
+    args = parser.parse_args()
+
     out_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "out")
     if os.path.exists(out_dir):
         shutil.rmtree(out_dir)
 
-    deps_count = 10
-    target = "x86_64-apple-darwin"
-
-    generate_workspace(out_dir, deps_count)
-    build_workspace(out_dir, deps_count, target)
+    generate_workspace(out_dir, args.deps_count)
+    build_workspace(out_dir, args.deps_count, args.target)
