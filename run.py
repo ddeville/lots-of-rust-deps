@@ -2,6 +2,7 @@ import argparse
 import os
 import shutil
 import subprocess
+import sys
 
 MAIN_CRATE_NAME = "so_many_deps"
 DEP_NAME_PREFIX = "some_long_and_annoying_name_"
@@ -47,6 +48,8 @@ def build_workspace(out: str, deps_count: int, target: str):
     if target:
         base_args.append("--target=" + target)
 
+    rustc = "rustc.exe" if sys.platform.startswith("win") else "rustc"
+
     deps = []
     for idx in range(deps_count):
         name = DEP_NAME_PREFIX + str(idx)
@@ -60,7 +63,7 @@ def build_workspace(out: str, deps_count: int, target: str):
         ]
         deps.append(name)
         print("Building", name)
-        subprocess.check_call(["rustc"] + args)
+        subprocess.check_call([rustc] + args)
 
     name = MAIN_CRATE_NAME
     os.makedirs(os.path.join(build_dir, name))
@@ -82,7 +85,7 @@ def build_workspace(out: str, deps_count: int, target: str):
         f.write(content)
         print("Param file length:", len(content))
 
-    subprocess.check_call(["rustc", "@" + param_file_path])
+    subprocess.check_call([rustc, "@" + param_file_path])
 
 
 if __name__ == "__main__":
