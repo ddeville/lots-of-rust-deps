@@ -27,6 +27,21 @@ macro_rules! {macro} {{
 }}
 """
 
+DEP_BUILD = """
+package(default_visibility = ["//visibility:public"])
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+rust_library(
+    name = "{name}",
+    version = "0.1.0",
+    edition = "2018",
+    crate_root = "src/lib.rs",
+    srcs = ["src/lib.rs"],
+    deps = [{deps}],
+    rustc_flags = ["-Ccodegen-units=16", "-Cdebug-assertions=on", "-Cembed-bitcode=no", "-Copt-level=0"],
+)
+"""
+
 LIB_TEMPLATE = """
 {externs}
 {uses}
@@ -37,7 +52,22 @@ pub fn main() {{
 }}
 """
 
-def generate_workspace(out: str, deps_count: int):
+LIB_BUILD = """
+package(default_visibility = ["//visibility:public"])
+load("@rules_rust//rust:defs.bzl", "rust_shared_library")
+
+rust_shared_library(
+    name = "{name}",
+    version = "0.1.0",
+    edition = "2018",
+    crate_root = "src/lib.rs",
+    srcs = ["src/lib.rs"],
+    deps = [{deps}],
+    rustc_flags = ["-Ccodegen-units=16", "-Cdebug-assertions=on", "-Cembed-bitcode=no", "-Copt-level=0"],
+)
+"""
+
+def generate_workspace(cwd: str, out: str, deps_count: int):
     for idx in range(deps_count):
         name = DEP_NAME_PREFIX + str(idx)
         src = os.path.join(out, name, "src")
@@ -53,6 +83,11 @@ def generate_workspace(out: str, deps_count: int):
                 func_calls = "\n".join(["    " + FUNCTION_PREFIX + str(i) + "();" for i in range(idx)]),
                 macro_calls = "\n".join(["    " + MACRO_PREFIX + str(i) + "!();" for i in range(idx)]),
             ))
+        with open(os.path.join(out, name, "BUILD.bazel"), "w") as f:
+            f.write(DEP_BUILD.format(
+                name = name,
+                deps = ",".join([f'"//{DEP_NAME_PREFIX + str(i)}:{DEP_NAME_PREFIX + str(i)}"' for i in range(idx)]),
+            ))
 
     src = os.path.join(out, MAIN_CRATE_NAME, "src")
     os.makedirs(src)
@@ -65,6 +100,14 @@ def generate_workspace(out: str, deps_count: int):
             func_calls = "\n".join(["    " + FUNCTION_PREFIX + str(i) + "();" for i in range(deps_count)]),
             macro_calls = "\n".join(["    " + MACRO_PREFIX + str(i) + "!();" for i in range(deps_count)]),
         ))
+
+    with open(os.path.join(out, MAIN_CRATE_NAME, "BUILD.bazel"), "w") as f:
+        f.write(LIB_BUILD.format(
+            name = MAIN_CRATE_NAME,
+            deps = ",".join([f'"//{DEP_NAME_PREFIX + str(i)}:{DEP_NAME_PREFIX + str(i)}"' for i in range(deps_count)]),
+        ))
+
+    shutil.copyfile(os.path.join(cwd, "WORKSPACE.bazel"), os.path.join(out_dir, "WORKSPACE.bazel"))
 
 def deps_args(deps, build_dir):
     args = ["--extern=" + name + "=" + os.path.join(build_dir, name, "lib" + name + ".rlib") for name in deps]
@@ -130,6 +173,10 @@ def build_workspace(out: str, deps_count: int, target: str):
     print("Building", name)
     subprocess.check_call([rustc, param_file(args, build_dir, name)])
 
+def bazel_build_workspace(out: str):
+    bazel = "bazel.exe" if sys.platform.startswith("win") else "bazel"
+    subprocess.check_call([bazel, "build", "//{name}:{name}".format(name=MAIN_CRATE_NAME)], cwd=out_dir)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate and build a Rust workspace")
@@ -137,9 +184,11 @@ if __name__ == "__main__":
     parser.add_argument("--target", help="The target to build")
     args = parser.parse_args()
 
-    out_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "out")
+    cwd = os.path.dirname(os.path.realpath(__file__))
+    out_dir = os.path.join(cwd, "out")
     if os.path.exists(out_dir):
         shutil.rmtree(out_dir)
 
-    generate_workspace(out_dir, args.deps_count)
-    build_workspace(out_dir, args.deps_count, args.target)
+    generate_workspace(cwd, out_dir, args.deps_count)
+    # build_workspace(out_dir, args.deps_count, args.target)
+    bazel_build_workspace(out_dir)
